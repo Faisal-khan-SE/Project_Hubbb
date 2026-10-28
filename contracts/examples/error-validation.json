@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Request validation failed",
+    "request_id": "7d0b8f8e-6b1f-4a43-9a7e-2f1f6f3c9a11",
+    "details": [{ "field": "title", "issue": "must not be blank" }]
+  }
+}

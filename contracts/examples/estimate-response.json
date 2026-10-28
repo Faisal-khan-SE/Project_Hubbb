@@ -1,0 +1,9 @@
+{
+  "price_min": "80000.00",
+  "price_max": "140000.00",
+  "days_min": 30,
+  "days_max": 55,
+  "complexity": "medium",
+  "features": ["user authentication", "product catalogue", "shopping cart", "order tracking", "admin panel"],
+  "model_version": "estimator-v1.0"
+}

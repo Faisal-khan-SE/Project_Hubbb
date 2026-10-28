@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "AI_UNAVAILABLE",
+    "message": "AI provider is unavailable, use fallback",
+    "request_id": "7d0b8f8e-6b1f-4a43-9a7e-2f1f6f3c9a12",
+    "details": []
+  }
+}

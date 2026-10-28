@@ -1,0 +1,18 @@
+# Redocly lint config for contracts/. Run: npx @redocly/cli lint
+# Intentional exceptions (documented so nobody "fixes" them by accident):
+# - no-server-example.com: our only server is localhost for local development.
+# - backend.yaml no-unused-components: shared error responses are defined up front; tasks A1-A14 start using them.
+# - ai-service.yaml /health has no 4xx response because it is unauthenticated and has no input.
+extends:
+  - recommended
+rules:
+  no-server-example.com: off
+apis:
+  ai-service:
+    root: contracts/openapi/ai-service.yaml
+    rules:
+      operation-4xx-response: off
+  backend:
+    root: contracts/openapi/backend.yaml
+    rules:
+      no-unused-components: off

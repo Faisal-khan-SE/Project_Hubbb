@@ -1,0 +1,62 @@
+# Local development services. Apps (backend, ai-service, frontend) run on your machine;
+# they are added here later (A10 / F6 add the e2e compose file).
+#
+#   docker compose up -d                          -> postgres, mailpit, minio
+#   docker compose --profile scan up -d clamav    -> optional virus scanner (heavy)
+#
+# Values come from .env (copy .env.example). Defaults below are for local use only.
+
+name: project-hubbb
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-marketplace}
+      POSTGRES_USER: ${DB_USER:-marketplace}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change-me-local-only}
+      TZ: UTC
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-marketplace} -d ${DB_NAME:-marketplace}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Fake SMTP server + web inbox. Backend dev/test profiles send all email here instead of Gmail (D20).
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI + API (used by e2e tests to read OTP codes)
+
+  # S3-compatible object storage for attachments, deliverables, invoices, KYC (private buckets).
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY:-minio-local}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY:-change-me-minio-local}
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Console
+    volumes:
+      - minio-data:/data
+
+  # Virus scanner (clamd on 3310). Optional locally, mandatory in prod (A13). Needs ~1-2 GB RAM.
+  clamav:
+    image: clamav/clamav:stable
+    profiles: ["scan"]
+    restart: unless-stopped
+    ports:
+      - "3310:3310"
+
+volumes:
+  pgdata:
+  minio-data:

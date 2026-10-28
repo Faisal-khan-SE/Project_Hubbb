@@ -1,0 +1,1 @@
+{ "risk_score": 0.91, "flags": ["off_platform_intent", "keyword_whatsapp"], "model_version": "moderation-v1.0", "latency_ms": 212 }

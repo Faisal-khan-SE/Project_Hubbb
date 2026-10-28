@@ -1,0 +1,8 @@
+{
+  "project_id": 101,
+  "title": "Online pharmacy website",
+  "description": "Customer login, product catalogue, cart, order tracking, admin panel...",
+  "category": "Web",
+  "skills": ["React", "Node.js", "PostgreSQL"],
+  "attachment_texts": ["optional extracted text of attached SRS/design files"]
+}

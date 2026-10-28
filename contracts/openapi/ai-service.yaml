@@ -1,0 +1,385 @@
+openapi: 3.1.0
+info:
+  title: Marketplace AI Service (internal)
+  version: 1.0.0
+  description: |
+    Internal HTTP API called only by the backend (Java). Never exposed to browsers.
+
+    - Auth: every `/v1/*` call must send header `X-Internal-Api-Key`.
+    - Money is sent as decimal STRINGS in PKR with 2 decimals (D1).
+    - `AI_MODE=mock` must return deterministic responses with no network calls.
+    - Backend timeouts: estimate 20 s (background job), moderate 800 ms (D8), chat 10 s.
+    - Errors use the standard error format. 422 = validation error, 503 = LLM provider unavailable
+      or internal timeout. The backend treats any non-200 or timeout as "AI unavailable".
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: http://localhost:8000
+    description: Local development
+security:
+  - internalApiKey: []
+tags:
+  - name: estimate
+    description: Price and time estimate for a project
+  - name: moderation
+    description: Layer-2 off-platform intent scoring
+  - name: chat
+    description: Dashboard chatbot
+  - name: health
+    description: Liveness
+paths:
+  /v1/estimate:
+    post:
+      tags: [estimate]
+      operationId: estimateProject
+      summary: Estimate price band and delivery days for a project
+      description: Rules - price_min <= price_max and days_min <= days_max. Called from a background job only (D9).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EstimateRequest'
+            example:
+              project_id: 101
+              title: Online pharmacy website
+              description: Customer login, product catalogue, cart, order tracking, admin panel...
+              category: Web
+              skills: [React, Node.js, PostgreSQL]
+              attachment_texts: [optional extracted text of attached SRS/design files]
+      responses:
+        '200':
+          description: Estimate produced
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EstimateResponse'
+              example:
+                price_min: '80000.00'
+                price_max: '140000.00'
+                days_min: 30
+                days_max: 55
+                complexity: medium
+                features: [user authentication, product catalogue, shopping cart, order tracking, admin panel]
+                model_version: estimator-v1.0
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/moderate:
+    post:
+      tags: [moderation]
+      operationId: moderateText
+      summary: Score a text for intent to move off-platform or share contact details
+      description: |
+        Returns a risk score 0..1. Routing is decided by the BACKEND, not here:
+        below 0.3 deliver; 0.3-0.7 admin queue; above 0.7 admin queue + strike if admin confirms.
+        Must answer within the backend's 800 ms budget; on internal timeout (600 ms) return 503.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModerateRequest'
+            example:
+              text: bhai apna number do, whatsapp pe baat karte hain
+              source: message
+              language_hint: roman_ur
+      responses:
+        '200':
+          description: Score produced
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModerateResponse'
+              example:
+                risk_score: 0.91
+                flags: [off_platform_intent, keyword_whatsapp]
+                model_version: moderation-v1.0
+                latency_ms: 212
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/chat:
+    post:
+      tags: [chat]
+      operationId: chat
+      summary: Dashboard chatbot (platform FAQ and project-description helper)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+            example:
+              user_role: client
+              question: How are payments released to the developer?
+              history: []
+      responses:
+        '200':
+          description: Answer produced
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+              example:
+                answer: Your payment is held by the platform and released stage by stage after you approve each stage.
+                model_version: chat-v1.0
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /health:
+    get:
+      tags: [health]
+      operationId: health
+      summary: Liveness check (no auth)
+      security: []
+      responses:
+        '200':
+          description: Service is up
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: ok
+                mode: mock
+                version: 1.0.0
+components:
+  securitySchemes:
+    internalApiKey:
+      type: apiKey
+      in: header
+      name: X-Internal-Api-Key
+  responses:
+    Unauthorized:
+      description: Missing or wrong X-Internal-Api-Key
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: Missing or invalid internal API key
+              request_id: 7d0b8f8e-6b1f-4a43-9a7e-2f1f6f3c9a10
+              details: []
+    ValidationError:
+      description: Request body failed validation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: Request validation failed
+              request_id: 7d0b8f8e-6b1f-4a43-9a7e-2f1f6f3c9a11
+              details:
+                - field: title
+                  issue: must not be blank
+    Unavailable:
+      description: LLM provider unavailable or internal timeout; backend must use its fallback
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: AI_UNAVAILABLE
+              message: AI provider is unavailable, use fallback
+              request_id: 7d0b8f8e-6b1f-4a43-9a7e-2f1f6f3c9a12
+              details: []
+  schemas:
+    Money:
+      type: string
+      description: PKR amount as a decimal string with exactly 2 decimals (D1). Never a float.
+      pattern: '^\d{1,10}\.\d{2}$'
+      examples: ['80000.00']
+    EstimateRequest:
+      type: object
+      additionalProperties: false
+      required: [project_id, title, description, category, skills]
+      properties:
+        project_id:
+          type: integer
+          format: int64
+          minimum: 1
+        title:
+          type: string
+          minLength: 3
+          maxLength: 200
+        description:
+          type: string
+          minLength: 10
+          maxLength: 20000
+        category:
+          type: string
+          minLength: 1
+          maxLength: 60
+        skills:
+          type: array
+          maxItems: 30
+          items:
+            type: string
+            minLength: 1
+            maxLength: 60
+        attachment_texts:
+          type: array
+          maxItems: 10
+          default: []
+          items:
+            type: string
+            maxLength: 50000
+    EstimateResponse:
+      type: object
+      additionalProperties: false
+      required: [price_min, price_max, days_min, days_max, complexity, features, model_version]
+      description: price_min <= price_max and days_min <= days_max are guaranteed by the service.
+      properties:
+        price_min:
+          $ref: '#/components/schemas/Money'
+        price_max:
+          $ref: '#/components/schemas/Money'
+        days_min:
+          type: integer
+          minimum: 1
+        days_max:
+          type: integer
+          minimum: 1
+        complexity:
+          type: string
+          enum: [low, medium, high]
+        features:
+          type: array
+          items:
+            type: string
+        model_version:
+          type: string
+          minLength: 1
+    ModerateRequest:
+      type: object
+      additionalProperties: false
+      required: [text, source]
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        source:
+          type: string
+          enum: [message, bid_proposal, offer_note, extension_reason, review_comment, deliverable_text]
+        language_hint:
+          type: string
+          enum: [en, roman_ur, ur, mixed, unknown]
+          default: unknown
+    ModerateResponse:
+      type: object
+      additionalProperties: false
+      required: [risk_score, flags, model_version, latency_ms]
+      properties:
+        risk_score:
+          type: number
+          minimum: 0
+          maximum: 1
+        flags:
+          type: array
+          items:
+            type: string
+        model_version:
+          type: string
+          minLength: 1
+        latency_ms:
+          type: integer
+          minimum: 0
+    ChatTurn:
+      type: object
+      additionalProperties: false
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+          maxLength: 4000
+    ChatRequest:
+      type: object
+      additionalProperties: false
+      required: [user_role, question]
+      properties:
+        user_role:
+          type: string
+          enum: [client, developer, admin]
+        question:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        history:
+          type: array
+          description: Previous turns; the service keeps only the last 6.
+          maxItems: 20
+          default: []
+          items:
+            $ref: '#/components/schemas/ChatTurn'
+    ChatResponse:
+      type: object
+      additionalProperties: false
+      required: [answer, model_version]
+      properties:
+        answer:
+          type: string
+        model_version:
+          type: string
+          minLength: 1
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [status, mode, version]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        mode:
+          type: string
+          enum: [mock, live]
+        version:
+          type: string
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message, request_id]
+          properties:
+            code:
+              type: string
+              pattern: '^[A-Z][A-Z0-9_]*$'
+            message:
+              type: string
+            request_id:
+              type: string
+              format: uuid
+            details:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                required: [field, issue]
+                properties:
+                  field:
+                    type: string
+                  issue:
+                    type: string
