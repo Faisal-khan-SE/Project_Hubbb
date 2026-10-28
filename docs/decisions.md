@@ -32,6 +32,13 @@ Copied from the SHARED CONTEXT BLOCK in `docs/PROMPT_PACK.md`. Changing any deci
 | D26 | Developer KYC: developers must pass KYC (CNIC number + front/back image + selfie optional) before verification_status can become verified. CNIC number encrypted like payout accounts, images stored privately, visible only to admins, never returned to clients. Delete KYC images 90 days after the account closes unless a dispute or legal hold exists. |
 | D27 | Legal pages: Terms of Service, Privacy Policy, Refund & Cancellation Policy, and Developer Agreement are versioned content (docs/legal/*.md, rendered by the frontend). Sign-up stores the accepted version and timestamp. Text is a DRAFT until reviewed by a lawyer (L1); the site shows nothing that claims legal approval. |
 
+## Conflicts with the source PDFs
+
+The source PDFs in `docs/source/` disagree with some decisions (tech stack, phone OTP, when other bids are
+rejected, status lists, account statuses, counters, review uniqueness, deliverable contact scan). All
+conflicts and which side wins are listed in `docs/requirements.md` section 16 (C1-C16). Open questions that
+may change a decision are in section 17 (Q1-Q10).
+
 ## Change log
 
 | Date | Decision | Change | Approved by |
